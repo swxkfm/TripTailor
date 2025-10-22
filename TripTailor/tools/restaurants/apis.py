@@ -49,7 +49,8 @@ class Restaurants:
         return result
 
 
-# 实例化并调用
-# finder = Restaurants()
-# result = finder.run('Harbin', [100, 200], 129.55464179978478, 46.32462172098222, top_n=10)
-# print(result)
+if __name__ == '__main__':
+    # 实例化并调用
+    finder = Restaurants()
+    result = finder.run('Harbin', [100, 200], 129.55464179978478, 46.32462172098222, top_n=10)
+    print(result)
