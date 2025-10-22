@@ -2,7 +2,7 @@
 
 INPUT_FILE="../agents/outputs/direct_input.json"
 SET_TYPE="test"
-MODEL_NAME="qwen-max"
+MODEL_NAME=""
 OUTPUT_DIR="./outputs"
 STRATEGY="react" # direct/cot/react/reflexion
 
