@@ -24,6 +24,7 @@ class TravelAgent:
         self.chat_client = ChatClient(model_name=model_name, api_key=api_key, base_url=base_url)
         self.demands_info = DemandsInfo()
         self.tools = self.load_tools(tools=tools)
+        self.user_profile = None
         
         self.transport_options_otd = {}
         self.transport_options_dto = {}
@@ -65,7 +66,7 @@ class TravelAgent:
             departure_time=self.demands_info.return_time,
         )
 
-    def fetch_and_select_transport_options(self, origin, destination, departure_date, direction, departure_time, given_info):
+    def fetch_and_select_transport_options(self, origin, destination, departure_date, direction, departure_time):
         flights = self.tools["flights"].run(origin=origin, destination=destination, departure_date=departure_date)
         trains = self.tools["trains"].run(origin=origin, destination=destination, departure_date=departure_date)
         if direction == "origin_to_destination":
@@ -157,9 +158,13 @@ class TravelAgent:
             self.major_transport[direction] = transport_options["trains"][transport_options["trains"]["Train_Number"] == transport_number]
             
  
-    def select_attractions(self, given_info):
-        # self.attractions = self.tools["attractions"].run(city=self.demands_info.destination_city)
-        self.attractions = pd.DataFrame(given_info['attractions'])
+    def select_attractions(self, given_info=None):
+        if not given_info:
+            self.attractions = self.tools["attractions"].run(city=self.demands_info.destination_city)
+            self.attractions_options = df_to_dict(self.attractions)
+        else:
+            self.attractions = pd.DataFrame(given_info['attractions'])
+            self.attractions_options = given_info['attractions']
         
         self.attractions = self.attractions.drop(columns=['poiId'], errors='ignore')  
         self.attractions['poiId'] = range(1, len(self.attractions) + 1)  
@@ -182,11 +187,10 @@ class TravelAgent:
 
         self.selected_ids = selected_ids
 
-        if len(selected_ids) == 0:
-            print(selected_ids[0])
+        # if len(selected_ids) == 0:
+        #     print(selected_ids[0])
 
         selected_pois = self.attractions[self.attractions["poiId"].isin(selected_ids)]
-        self.attractions_options = given_info['attractions']
         results = []
 
         for _, row in selected_pois.iterrows():
@@ -505,6 +509,7 @@ class TravelAgent:
             tools_map[tool_name] = getattr(module, tool_name[0].upper()+tool_name[1:])()
         return tools_map
     
+    
     def generate_plan_direct(self, given_information):
         message = planner_agent_prompt.format(text=given_information, query=self.user_query)
         response = self.chat_client.chat_completion(user_message=message)
@@ -612,7 +617,7 @@ class TravelAgent:
     def run_presearch(self, given_info):
         self.extract_demands()
         presearch_info = self.presearch(given_info)
-        return presearch_info, format_given_information(presearch_info)
+        return presearch_info, format_given_information(presearch_info, self.demands_info.departure_city, self.demands_info.destination_city)
 
     
  
@@ -623,6 +628,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_file", type=str)
     parser.add_argument("--info_file", type=str)
     parser.add_argument("--output_path", type=str)
+    parser.add_argument("--output_info_file", type=str)
     parser.add_argument("--model_name", type=str)
     parser.add_argument("--mode", type=str, default='')
     parser.add_argument("--api_key", type=str)
@@ -635,6 +641,7 @@ if __name__ == "__main__":
     input_file = args.input_file
     info_file = args.info_file
     output_path = args.output_path
+    output_info_file = args.output_info_file
     mode = args.mode
 
     api_key = args.api_key
@@ -681,8 +688,8 @@ if __name__ == "__main__":
 
                     travel_agent = TravelAgent(user_query=user_query, model_name=model_name, api_key=api_key, base_url=base_url)
                     try:
-                        given_info = given_info_data[str(entry['pid'])]
-                        final_plan, given_data = travel_agent.run(mode=mode, given_info=given_info)
+                        # given_info = given_info_data[str(entry['pid'])]
+                        final_plan, given_data = travel_agent.run()
                     except Exception as e:
                         print(f"Error during run() for entry with id {entry.get('pid')}: {e}")
                         import traceback
@@ -834,10 +841,8 @@ if __name__ == "__main__":
     if mode == 'direct':
         process_and_save_incrementally_direct(input_file, output_file)
     elif mode == 'presearch':
-        input_info_file = ''
-        output_text_file = output_file
-        output_info_file = ''
-        genarate_given_info(input_file, input_info_file, output_text_file, output_info_file)
+        output_file = f'{output_path}/direct_input.json'
+        genarate_given_info(input_file, info_file, output_file, output_info_file)
    
     else:
         while True:
