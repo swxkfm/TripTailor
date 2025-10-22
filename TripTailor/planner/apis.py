@@ -19,6 +19,7 @@ from enum import Enum
 from typing import List, Union, Literal
 from langchain_google_genai import ChatGoogleGenerativeAI
 import argparse
+import traceback
 
 
 OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
@@ -27,15 +28,15 @@ GOOGLE_API_KEY = os.environ['GOOGLE_API_KEY']
 
 
 def catch_openai_api_error():
-    error = sys.exc_info()[0]
-    if error == openai.error.APIConnectionError:
+    error = sys.exc_info()[1]
+    if isinstance(error, openai.APIConnectionError):
         print("APIConnectionError")
-    elif error == openai.error.RateLimitError:
+    elif isinstance(error, openai.RateLimitError):
         print("RateLimitError")
         time.sleep(60)
-    elif error == openai.error.APIError:
+    elif isinstance(error, openai.APIError):
         print("APIError")
-    elif error == openai.error.AuthenticationError:
+    elif isinstance(error, openai.AuthenticationError):
         print("AuthenticationError")
     else:
         print("API error:", error)
@@ -100,7 +101,7 @@ class Planner:
             if len(self.enc.encode(self._build_agent_prompt(text, query))) > 128000:
                 return 'Max Token Length Exceeded.'
             else:
-                return self.llm([HumanMessage(content=self._build_agent_prompt(text, query))]).content
+                return self.llm.invoke([HumanMessage(content=self._build_agent_prompt(text, query))]).content
 
     def _build_agent_prompt(self, text, query) -> str:
         return self.agent_prompt.format(
@@ -119,7 +120,7 @@ class ReactPlanner:
         
         self.agent_prompt = agent_prompt
         self.react_llm = ChatOpenAI(model_name=model_name, temperature=0, max_tokens=1024, 
-                                    openai_api_key=OPENAI_API_KEY,openai_api_base=OPENAI_BASE_URL,model_kwargs={"stop": ["Action","Thought","Observation:"]})
+                                    openai_api_key=OPENAI_API_KEY,openai_api_base=OPENAI_BASE_URL,model_kwargs={"stop": ["Action","Thought","Observation"]})
         self.expand_llm = ChatOpenAI(model_name=model_name, temperature=0, max_tokens=4096, 
                                     openai_api_key=OPENAI_API_KEY,openai_api_base=OPENAI_BASE_URL)
         self.env = ReactEnv()
@@ -189,8 +190,9 @@ class ReactPlanner:
     def prompt_agent(self) -> str:
         while True:
             try:
-                return format_step(self.react_llm([HumanMessage(content=self._build_agent_prompt())]).content)
+                return format_step(self.react_llm.invoke([HumanMessage(content=self._build_agent_prompt())]).content)
             except:
+                print(traceback.format_exc)
                 catch_openai_api_error()
                 print(self._build_agent_prompt())
                 print(len(self.enc.encode(self._build_agent_prompt())))
@@ -216,7 +218,7 @@ class ReactPlanner:
         self.finished = False
     
     def expand(self, answer, text) -> None:
-        return self.expand_llm([HumanMessage(content=expand_prompt.format(original_itinerary=answer, reference_information=text))]).content
+        return self.expand_llm.invoke([HumanMessage(content=expand_prompt.format(original_itinerary=answer, reference_information=text))]).content
 
 
 class ReactReflectPlanner:
@@ -330,7 +332,7 @@ class ReactReflectPlanner:
                 if self.model_name in ['gemini']:
                     return format_step(self.react_llm.invoke(self._build_agent_prompt()).content)
                 else:
-                    return format_step(self.react_llm([HumanMessage(content=self._build_agent_prompt())]).content)
+                    return format_step(self.react_llm.invoke([HumanMessage(content=self._build_agent_prompt())]).content)
             except:
                 catch_openai_api_error()
                 print(self._build_agent_prompt())
@@ -343,7 +345,7 @@ class ReactReflectPlanner:
                 if self.model_name in ['gemini']:
                     return format_step(self.reflect_llm.invoke(self._build_reflection_prompt()).content)
                 else:
-                    return format_step(self.reflect_llm([HumanMessage(content=self._build_reflection_prompt())]).content)
+                    return format_step(self.reflect_llm.invoke([HumanMessage(content=self._build_reflection_prompt())]).content)
             except:
                 catch_openai_api_error()
                 print(self._build_reflection_prompt())
@@ -380,7 +382,7 @@ class ReactReflectPlanner:
         self.env.reset()
     
     def expand(self, answer, text) -> None:
-        return self.expand_llm([HumanMessage(content=expand_prompt.format(original_itinerary=answer, reference_information=text))]).content
+        return self.expand_llm.invoke([HumanMessage(content=expand_prompt.format(original_itinerary=answer, reference_information=text))]).content
 
 def format_step(step: str) -> str:
     return step.strip('\n').strip().replace('\n', '')
