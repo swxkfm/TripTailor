@@ -268,10 +268,10 @@ def transform_test_data(data):
 
 # # Load the JSON data
 
-with open('', 'r', encoding='utf-8') as file:
+with open('../../database_EN/train.json', 'r', encoding='utf-8') as file:
     data = json.load(file)
 
-with open('', 'r', encoding='utf-8') as file:
+with open('../../database_EN/test.json', 'r', encoding='utf-8') as file:
     test_data = json.load(file)
 
 
@@ -302,7 +302,7 @@ dataset_dict = DatasetDict({
 })
 
 # Save datasets to disk so they can be loaded with `load_from_disk`
-dataset_path = 'dataset_path'
+dataset_path = './'
 
 dataset_dict.save_to_disk(dataset_path)
 
