@@ -39,10 +39,15 @@ if __name__ == '__main__':
     
     for number in tqdm(numbers):
         query_data = query_data_list[number-1]
-        with open(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json', encoding='utf-8') as f:
-            result = json.load(f)
+        try:
+            with open(f'{args.output_dir}/{args.set_type}/generated_plan_{number}.json', encoding='utf-8') as f:
+                result = json.load(f)
+        except:
+            continue
         query = query_data['query']
         pid = query_data['pid']
+        if result_key not in result[-1]:
+            continue
         plan = result[-1][result_key]
 
         test_data = [item for item in data if item['pid'] == pid]
