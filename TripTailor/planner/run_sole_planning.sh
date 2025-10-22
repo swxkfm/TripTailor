@@ -6,8 +6,8 @@ MODEL_NAME="qwen-max"
 OUTPUT_DIR="./outputs"
 STRATEGY="react" # direct/cot/react/reflexion
 
-API_KEY="sk-aade0e571cb64c38a8a23598b7907dd2"
-BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
+API_KEY=""
+BASE_URL=""
 
 export OPENAI_API_KEY="$API_KEY"
 export OPENAI_BASE_URL="$BASE_URL"
