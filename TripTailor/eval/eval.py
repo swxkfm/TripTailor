@@ -1,3 +1,6 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from geopy.distance import geodesic
 import re
 from datetime import datetime
@@ -8,7 +11,6 @@ from tqdm import tqdm
 from utils.ChatClient import ChatClient
 from prompt import EXTRACT_PROMPT, EVALUATION_PROMPT
 import argparse
-import os
 
 OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 OPENAI_BASE_URL = os.environ['OPENAI_BASE_URL']
@@ -108,7 +110,7 @@ def is_within_sandbox(plan, given_info):
 
     hotel_res = True
 
-    given_hotels = pd.DataFrame(given_info['hotel'])
+    given_hotels = pd.DataFrame(given_info['hotels'])
     matched, _ = match_accommodation(hotel['name'], given_hotels)
     if not matched:
         hotel_res = False
@@ -247,7 +249,7 @@ def route_lenght(plan, given_info, mode=0):
     hotel = plan['hotel'][0]
     daily_itinerary = plan['itinerary']
 
-    given_hotels = pd.DataFrame(given_info['hotel'])
+    given_hotels = pd.DataFrame(given_info['hotels'])
     _, hotel_selected = match_accommodation(hotel['name'], given_hotels)
     hotel_point = (float(hotel_selected['latitude']), float(hotel_selected['longitude']))
 
@@ -433,6 +435,9 @@ def eval(input_file, plan_key, given_info_data, given_info_data_final):
         average_route_distance_f = [route_lenght(plan_json_f, given_info_f, mode=i) for i in range(3)]
         item['final_plan_constraint'] = {'Average Route Distance': average_route_distance_f}
     
+    with open(input_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
     return data
 
 def extract_plan(input_file, plan_key, model_name, api_key, base_url):
@@ -555,7 +560,7 @@ def get_reference_information(plan, given_info):
     transportation = plan['transportation']
     daily_itinerary = plan['itinerary']
 
-    given_hotels = pd.DataFrame(given_info['hotel'])
+    given_hotels = pd.DataFrame(given_info['hotels'])
     matched, accommodation = match_accommodation(hotel['name'], given_hotels)
     if matched:
         accommodation = format_hotel_information(accommodation)
@@ -786,14 +791,18 @@ def eval_result(input_file, plan_key, data_mode='all'):
             if item['final_plan_constraint']['Average Route Distance'][2] != 0:
                 average_route_distance_ratio_list_3.append(constraint['Average Route Distance'][2] / item['final_plan_constraint']['Average Route Distance'][2])
         
-        if item[f'{plan_key}_llm_score'][f'{plan_key}_plan'] > item[f'{plan_key}_llm_score']['final_plan']:
-            result['llm'] += 1
+        if f'{plan_key}_llm_score' in item:
+            if item[f'{plan_key}_llm_score'][f'{plan_key}_plan'] > item[f'{plan_key}_llm_score']['final_plan']:
+                result['llm'] += 1
         
-        if item[f'{plan_key}_rm_score'] > item['final_plan_rm_score']:
-            result['rm'] += 1
+        if f'{plan_key}_rm_score' in item:
+            if item[f'{plan_key}_rm_score'] > item['final_plan_rm_score']:
+                result['rm'] += 1
         
         if constraint['Feasibility'] and constraint['Rationality']:
-            if item[f'{plan_key}_llm_score'][f'{plan_key}_plan'] > item[f'{plan_key}_llm_score']['final_plan'] or item[f'{plan_key}_rm_score'] > item['final_plan_rm_score']:
+            if item[f'{plan_key}_llm_score'][f'{plan_key}_plan'] > item[f'{plan_key}_llm_score']['final_plan']:
+                result['final_surpassing_rate'] += 1
+            elif f'{plan_key}_rm_score' in item and item[f'{plan_key}_rm_score'] > item['final_plan_rm_score']:
                 result['final_surpassing_rate'] += 1
     
     for key in result.keys():
@@ -814,12 +823,13 @@ def eval_result(input_file, plan_key, data_mode='all'):
     result['average_route_distance_ref_without_hotel'] = sum(average_route_distance_ref_list_2) / len(average_route_distance_ref_list_2)
     result['average_route_distance_ref_without_hotel_restaurant'] = sum(average_route_distance_ref_list_3) / len(average_route_distance_ref_list_3)
 
-    print(f'{data_mode} ({len(data)}): ')
+    print(f'\n{data_mode} ({len(data)}): ')
     for key, value in result.items():
         if key != 'method':
             print(f"{key}: {value:.4f}")
         else:
             print(f"{key}: {value}")
+    print()
         
 def eval_result_detail(input_file, plan_key, data_mode='all'):
     with open(input_file, encoding='utf-8') as f:
@@ -854,16 +864,18 @@ def eval_result_detail(input_file, plan_key, data_mode='all'):
         result['Appropriate Visit Duration'] += int(constraint['Appropriate Visit Duration'])
         if item[f'{plan_key}_llm_score'][f'{plan_key}_plan'] > item[f'{plan_key}_llm_score']['final_plan']:
             result['llm'] += 1
-        if item[f'{plan_key}_rm_score'] > item['final_plan_rm_score']:
+        if f'{plan_key}_rm_score' in item and item[f'{plan_key}_rm_score'] > item['final_plan_rm_score']:
             result['rm'] += 1
         
         if constraint['Feasibility'] and constraint['Rationality']:
             result['Final Pass Rate'] += 1
-            if item[f'{plan_key}_llm_score'][f'{plan_key}_plan'] > item[f'{plan_key}_llm_score']['final_plan'] or item[f'{plan_key}_rm_score'] > item['final_plan_rm_score']:
+            if item[f'{plan_key}_llm_score'][f'{plan_key}_plan'] > item[f'{plan_key}_llm_score']['final_plan']:
+                result['Final Surpassing Rate'] += 1
+            elif f'{plan_key}_rm_score' in item and item[f'{plan_key}_rm_score'] > item['final_plan_rm_score']:
                 result['Final Surpassing Rate'] += 1
     
     for key in result.keys():
-        if key != 'planning':
+        if key != 'planning' and key != 'method':
             result[key] /= len(data)
             result[key] *= 100
 
@@ -872,6 +884,7 @@ def eval_result_detail(input_file, plan_key, data_mode='all'):
             print(f"{key}: {value:.4f}")
         else:
             print(f"{key}: {value}")
+    print()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -879,6 +892,7 @@ if __name__ == '__main__':
     parser.add_argument("--strategy", type=str, default="direct")
     parser.add_argument("--input_file", type=str, default="./")
     parser.add_argument("--info_file", type=str, default="./")
+    parser.add_argument("--final_info_file", type=str, default="./")
     parser.add_argument("--eval_model_name", type=str, default="")
     parser.add_argument("--rm_file", type=str, default="./")
 
@@ -892,8 +906,11 @@ if __name__ == '__main__':
     plan_key = f'{args.model_name}_{args.strategy}'
     with open(args.info_file, encoding='utf-8') as f:
         given_info_data = json.load(f)
-    eval(input_file, plan_key, given_info_data)
+    with open(args.final_info_file, encoding='utf-8') as f:
+        given_info_data_final = json.load(f)
+    
     extract_plan(input_file, plan_key, model_name, api_key, base_url)
+    eval(input_file, plan_key, given_info_data, given_info_data_final)
     llm_eval_plan(input_file, plan_key, given_info_data, model_name, api_key, base_url)
     llm_eval(input_file, plan_key)
     rm_eval(input_file, args.rm_file, plan_key)
