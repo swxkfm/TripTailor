@@ -3,7 +3,7 @@ import re
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../..")))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-from agents.prompts import planner_agent_prompt, cot_planner_agent_prompt, react_planner_agent_prompt,react_reflect_planner_agent_prompt,reflect_prompt
+from prompts import planner_agent_prompt, cot_planner_agent_prompt, react_planner_agent_prompt,react_reflect_planner_agent_prompt,reflect_prompt
 # from utils.func import get_valid_name_city,extract_before_parenthesis, extract_numbers_from_filenames
 import json
 import time
@@ -40,15 +40,15 @@ def extract_numbers_from_filenames(directory):
 
 
 def catch_openai_api_error():
-    error = sys.exc_info()[0]
-    if error == openai.error.APIConnectionError:
+    error = sys.exc_info()[1]
+    if isinstance(error, openai.APIConnectionError):
         print("APIConnectionError")
-    elif error == openai.error.RateLimitError:
+    elif isinstance(error, openai.RateLimitError):
         print("RateLimitError")
         time.sleep(60)
-    elif error == openai.error.APIError:
+    elif isinstance(error, openai.APIError):
         print("APIError")
-    elif error == openai.error.AuthenticationError:
+    elif isinstance(error, openai.AuthenticationError):
         print("AuthenticationError")
     else:
         print("API error:", error)
@@ -57,6 +57,7 @@ def catch_openai_api_error():
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--input_file", type=str, default="")
     parser.add_argument("--set_type", type=str, default="validation")
     parser.add_argument("--model_name", type=str, default="gpt-3.5-turbo-1106")
     parser.add_argument("--output_dir", type=str, default="./")
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     elif args.set_type == 'validation':
         pass
     elif args.set_type == 'test':
-        with open('test_query.json', encoding='utf-8') as f:
+        with open(args.input_file, 'r', encoding='utf-8') as f:
             query_data_list = json.load(f)
     numbers = [i for i in range(1,len(query_data_list)+1)]
 
