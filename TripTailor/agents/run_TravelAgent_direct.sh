@@ -1,0 +1,25 @@
+#!/bin/bash
+
+INPUT_FILE="./outputs/direct_input.json"
+INPUT_INFO_FILE="../database_EN/infomation.json"
+OUTPUT_PATH="./outputs"
+MODEL_NAME=""
+MODE="direct"
+OUTPUT_INFO_FILE="../database_EN/given_info_data_${MODE}.json"
+
+API_KEY=""
+BASE_URL=""
+
+mkdir -p "$OUTPUT_PATH"
+
+LOG_FILE="${MODEL_NAME}_${MODE}_log.txt"
+
+python TravelAgent.py --input_file "$INPUT_FILE" \
+                    --info_file "$INPUT_INFO_FILE" \
+                    --output_path "$OUTPUT_PATH" \
+                    --output_info_file "$OUTPUT_INFO_FILE" \
+                    --model_name "$MODEL_NAME" \
+                    --mode "$MODE" \
+                    --api_key "$API_KEY" \
+                    --base_url "$BASE_URL"\
+                    &> "$OUTPUT_PATH"/"$LOG_FILE" 
